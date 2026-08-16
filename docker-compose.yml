@@ -1,0 +1,184 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: telecom-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-telecom}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-telecom}
+      POSTGRES_DB: ${POSTGRES_DB:-telecom}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-telecom} -d ${POSTGRES_DB:-telecom}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  kafka:
+    image: apache/kafka:3.9.0
+    container_name: telecom-kafka
+    hostname: kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      CLUSTER_ID: 4L6g3nShT-eMCtK--X86sw
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+
+  kafka-init:
+    image: apache/kafka:3.9.0
+    container_name: telecom-kafka-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    restart: "no"
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic network.metrics --partitions 6 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic network.metrics.dlq --partitions 3 --replication-factor 1
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list
+
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: telecom-grafana
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/network_ops.json
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  seed:
+    build: .
+    container_name: telecom-seed
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-telecom}:${POSTGRES_PASSWORD:-telecom}@postgres:5432/${POSTGRES_DB:-telecom}
+    command: ["python", "/app/scripts/seed_topology.py"]
+    restart: "no"
+
+  processor:
+    build: .
+    container_name: telecom-processor
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+      seed:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-telecom}:${POSTGRES_PASSWORD:-telecom}@postgres:5432/${POSTGRES_DB:-telecom}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_METRICS_TOPIC: network.metrics
+      KAFKA_DLQ_TOPIC: network.metrics.dlq
+      KAFKA_CONSUMER_GROUP: metrics-processor
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    command: ["python", "-m", "pipeline.main"]
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import time,pathlib; p=pathlib.Path('/tmp/processor_healthy'); assert p.exists() and time.time()-float(p.read_text())<45\"",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 25s
+    restart: unless-stopped
+
+  simulator:
+    build: .
+    container_name: telecom-simulator
+    depends_on:
+      processor:
+        condition: service_started
+      kafka-init:
+        condition: service_completed_successfully
+      seed:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-telecom}:${POSTGRES_PASSWORD:-telecom}@postgres:5432/${POSTGRES_DB:-telecom}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_METRICS_TOPIC: network.metrics
+      SIMULATOR_INTERVAL_SECONDS: ${SIMULATOR_INTERVAL_SECONDS:-10}
+      BACKFILL_HOURS: ${BACKFILL_HOURS:-6}
+      INVALID_RATE: ${INVALID_RATE:-0.015}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    command: ["python", "-m", "simulator.main"]
+    restart: unless-stopped
+
+  batch:
+    build: .
+    container_name: telecom-batch
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-telecom}:${POSTGRES_PASSWORD:-telecom}@postgres:5432/${POSTGRES_DB:-telecom}
+      ETL_INTERVAL_SECONDS: 60
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    command: ["python", "-m", "batch.run_etl"]
+    restart: unless-stopped
+
+  ml-worker:
+    build: .
+    container_name: telecom-ml
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-telecom}:${POSTGRES_PASSWORD:-telecom}@postgres:5432/${POSTGRES_DB:-telecom}
+      MODEL_VERSION: ${MODEL_VERSION:-iforest_v1}
+      MODEL_PATH: /app/models/iforest_v1.joblib
+      ML_MIN_TRAIN_ROWS: 40000
+      ML_SCORE_INTERVAL_SECONDS: 20
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    command: ["python", "-m", "ml.worker"]
+    volumes:
+      - ml_models:/app/models
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  grafana_data:
+  ml_models:
