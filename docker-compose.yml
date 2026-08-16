@@ -189,6 +189,52 @@ services:
       - ml_models:/app/models
     restart: unless-stopped
 
+  alert-engine:
+    build: .
+    container_name: telecom-alerts
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-telecom}:${POSTGRES_PASSWORD:-telecom}@postgres:5432/${POSTGRES_DB:-telecom}
+      ALERT_INTERVAL_SECONDS: 20
+      ALERT_LOOKBACK_MINUTES: 45
+      ALERT_COOLDOWN_MINUTES: 15
+      SERVICENOW_INSTANCE: ${SERVICENOW_INSTANCE:-}
+      SERVICENOW_USER: ${SERVICENOW_USER:-}
+      SERVICENOW_PASSWORD: ${SERVICENOW_PASSWORD:-}
+      LLM_ENABLED: ${LLM_ENABLED:-false}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    command: ["python", "-m", "alerts.engine"]
+    restart: unless-stopped
+
+  api:
+    build: .
+    container_name: telecom-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      seed:
+        condition: service_completed_successfully
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-telecom}:${POSTGRES_PASSWORD:-telecom}@postgres:5432/${POSTGRES_DB:-telecom}
+      LLM_ENABLED: ${LLM_ENABLED:-false}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 15s
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   grafana_data:

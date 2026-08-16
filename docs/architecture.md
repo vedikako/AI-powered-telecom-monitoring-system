@@ -16,6 +16,9 @@ flowchart TD
   Anom[ml.anomalies]
   GT[ops.injected_incidents]
   Graf[Grafana]
+  Alert[AlertEngine]
+  SN[ServiceNow_or_mock]
+  API[FastAPI]
 
   Sim -->|JSON keyed by cell_id| Kafka
   Kafka --> Proc
@@ -31,6 +34,11 @@ flowchart TD
   An --> Graf
   Anom --> Graf
   DQ --> Graf
+  Anom --> Alert
+  Alert --> SN
+  API --> Clean
+  API --> Anom
+  API --> Alert
 ```
 
 ## Why each piece exists
@@ -42,6 +50,7 @@ flowchart TD
 - **Batch ETL** — hourly/daily rollups. In production this job would be Airflow/Dagster; here it is a loop.
 - **Isolation Forest** — multivariate outliers vs **cell baselines**. A rural 4G cell at 80 ms can be normal; urban 5G at 80 ms is not.
 - **Grafana** — two boards on purpose: network health **and** pipeline health.
+- **Alert engine / FastAPI** — optional. Rules explain anomalies; HIGH/CRITICAL go to a ServiceNow sink (mock by default). Removing these services does not stop ingest.
 
 ## Kafka
 

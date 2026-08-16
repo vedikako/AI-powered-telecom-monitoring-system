@@ -35,6 +35,15 @@ class Settings:
     batch_wait_seconds: float = float(_env("PROCESSOR_BATCH_WAIT_SECONDS", "2"))
     quality_interval_seconds: float = float(_env("QUALITY_INTERVAL_SECONDS", "30"))
     max_event_age_seconds: int = int(_env("MAX_EVENT_AGE_SECONDS", "3600"))
+    alert_interval_seconds: float = float(_env("ALERT_INTERVAL_SECONDS", "20"))
+    alert_lookback_minutes: float = float(_env("ALERT_LOOKBACK_MINUTES", "45"))
+    alert_cooldown_minutes: float = float(_env("ALERT_COOLDOWN_MINUTES", "15"))
+    servicenow_instance: str = _env("SERVICENOW_INSTANCE", "")
+    servicenow_user: str = _env("SERVICENOW_USER", "")
+    servicenow_password: str = _env("SERVICENOW_PASSWORD", "")
+    llm_enabled: bool = _env("LLM_ENABLED", "false").lower() in {"1", "true", "yes"}
+    openai_api_key: str = _env("OPENAI_API_KEY", "")
+    llm_model: str = _env("LLM_MODEL", "gpt-4o-mini")
 
 
 settings = Settings()

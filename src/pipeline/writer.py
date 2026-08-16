@@ -77,7 +77,7 @@ def insert_batch(
                             is_dup,
                         )
                     )
-                execute_values(
+                inserted = execute_values(
                     cur,
                     """
                     INSERT INTO clean.network_metrics (
@@ -88,13 +88,14 @@ def insert_batch(
                     )
                     VALUES %s
                     ON CONFLICT (cell_id, event_ts) DO NOTHING
+                    RETURNING cell_id
                     """,
                     clean_rows,
+                    fetch=True,
                 )
-                clean_n = cur.rowcount if cur.rowcount is not None else 0
-                skipped = len(clean_rows) - clean_n
-                if skipped > dup_n:
-                    dup_n = skipped
+                clean_n = len(inserted or [])
+                conflict_dups = len(clean_rows) - clean_n
+                dup_n = max(dup_n, conflict_dups)
 
             if invalid:
                 execute_values(

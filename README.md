@@ -111,16 +111,18 @@ That prints precision, recall, F1, false-positive rate, and a confusion matrix a
 
 ## Measured results
 
-From a local Docker run on 16 Aug 2026 (processor still catching up the 216k-event backfill). Re-run the commands below after lag is near 0 for a true live steady state.
+From a local Docker run on 16 Aug 2026 after the consumer caught up (Kafka lag = 0 on all 6 partitions).
 
 | Area | Metric | Value |
 |---|---|---|
-| Pipeline | Events processed | 51,882 received / 51,083 valid (snapshot); 61,180 rows in `clean.network_metrics` and growing |
-| Pipeline | Invalid record % | 1.54% (799 / 51,882) — matches the ~1.5% injected defects |
-| Pipeline | Consumer lag (steady state) | Not yet — ~160k during backfill catch-up. Recheck when live. |
-| Pipeline | Freshness (seconds) | ~14,868s during catch-up (old backfill timestamps). Expect ~10s once live. |
-| Pipeline | Validate latency | 0.14 ms / event |
-| ML | Precision / recall / F1 | 0.92 / 0.99 / 0.96 (n=60,107; FPR=0.02) |
+| Pipeline | Events processed | 232,204 valid rows in `clean.network_metrics`; 3,596 invalid |
+| Pipeline | Invalid record % | 1.52% (3,596 / 235,800) — matches the ~1.5% injected defects |
+| Pipeline | Consumer lag (steady state) | 0 (live in-flight ~0–50) |
+| Pipeline | Freshness (seconds) | ~5 s |
+| Pipeline | Validate latency | 0.01–0.14 ms / event |
+| ML | Precision / recall / F1 | 0.58 / 1.00 / 0.73 (n=232,301; FPR=0.23) |
+
+The Isolation Forest was trained on an early backfill window, so recall is high but peak-hour load is over-flagged. Retraining on a full-day mix of normal cells would be the next ML improvement — not a fake 0.99 F1.
 
 **Where each number comes from (not the Grafana KPI row):**
 
@@ -134,9 +136,27 @@ docker exec telecom-ml python /app/scripts/evaluate_model.py
 
 Grafana **Network Operations** is network health (cells, latency, throughput). Grafana **Pipeline Health** is closer to this table (lag, invalid count, freshness).
 
-## Post-MVP (not in this repo yet)
+## Post-MVP (in this repo)
 
-Alert engine → ServiceNow incident create, FastAPI cell analysis, rule/LLM explanation that can be removed without breaking the pipeline.
+These sit **on top of** the pipeline. Removing them does not stop Kafka, Postgres, Grafana, or Isolation Forest.
+
+| Piece | What it does | Default |
+|---|---|---|
+| Alert engine | Turns recent anomalies into `ops.alerts` with severity + rule-based cause | On (`alert-engine` service) |
+| ServiceNow sink | `AlertSink` protocol: mock locally, real Table API if credentials are set | **Mock** (free, no account) |
+| FastAPI | Cell analysis, alerts, incidents, pipeline quality | [http://localhost:8000/docs](http://localhost:8000/docs) |
+| Explanation | Rules first (`CONGESTION` / `OUTAGE` / `HARDWARE` / `INTERFERENCE`). Optional LLM sentence if `LLM_ENABLED=true` | Rules only |
+
+```bash
+# After compose is up
+curl http://localhost:8000/health
+curl http://localhost:8000/network-health
+curl http://localhost:8000/alerts
+curl http://localhost:8000/incidents
+curl http://localhost:8000/cells/CELL_001_01/analysis
+```
+
+HIGH/CRITICAL alerts create a ServiceNow incident via the mock sink (`ops.servicenow_incidents`, numbers like `INC0000001`). To use a real developer instance, set `SERVICENOW_INSTANCE`, `SERVICENOW_USER`, and `SERVICENOW_PASSWORD` in `.env`. To drop the LLM later, leave `LLM_ENABLED=false` or delete `src/explain/llm.py` — `explain.rules` still works.
 
 ## Project identity
 

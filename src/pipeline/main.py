@@ -91,6 +91,8 @@ def run() -> None:
             "auto.offset.reset": "earliest",
             "enable.auto.commit": False,
             "max.poll.interval.ms": 300000,
+            "queued.max.messages.kbytes": 1024,
+            "fetch.min.bytes": 1,
         }
     )
     dlq = Producer(
@@ -115,51 +117,46 @@ def run() -> None:
 
     try:
         while _running:
-            msg = consumer.poll(0.05)
+            msgs = consumer.consume(num_messages=settings.batch_size, timeout=1.0)
             _heartbeat()
             now = time.time()
-
-            if msg is None:
+            if not msgs:
                 if pending_valid or pending_invalid:
                     if now - last_batch >= settings.batch_wait_seconds:
-                        _flush(consumer, dlq, quality, pending_valid, pending_invalid)
-                        pending_valid, pending_invalid = [], []
-                        last_batch = now
+                        if _flush(consumer, dlq, quality, pending_valid, pending_invalid):
+                            pending_valid, pending_invalid = [], []
+                            last_batch = now
                 quality.maybe_flush(settings.quality_interval_seconds, consumer_lag(consumer))
                 continue
 
-            if msg.error():
-                log.warning("kafka_error", extra={"event": "kafka_error", "error": str(msg.error())})
-                continue
+            for msg in msgs:
+                if msg.error():
+                    log.warning("kafka_error", extra={"event": "kafka_error", "error": str(msg.error())})
+                    continue
+                quality.mark_received()
+                start = time.perf_counter()
+                event, failure = validate_payload(msg.value())
+                quality.set_latency((time.perf_counter() - start) * 1000)
+                if event is not None and event.cell_id not in known_cells:
+                    failure = ValidationFailure(
+                        error_class="schema_fail",
+                        error_reason=f"unknown cell_id: {event.cell_id}",
+                        payload=event.model_dump(mode="json"),
+                    )
+                    event = None
+                if failure is not None:
+                    quality.mark_invalid(failure.error_class)
+                    pending_invalid.append((failure, msg.partition(), msg.offset()))
+                    _send_dlq(dlq, failure, msg.partition(), msg.offset(), msg.value())
+                else:
+                    quality.mark_valid()
+                    payload = event.model_dump(mode="json")
+                    pending_valid.append((event, msg.partition(), msg.offset(), payload))
 
-            quality.mark_received()
-            start = time.perf_counter()
-            event, failure = validate_payload(msg.value())
-            latency_ms = (time.perf_counter() - start) * 1000
-            quality.set_latency(latency_ms)
-
-            if event is not None and event.cell_id not in known_cells:
-                failure = ValidationFailure(
-                    error_class="schema_fail",
-                    error_reason=f"unknown cell_id: {event.cell_id}",
-                    payload=event.model_dump(mode="json"),
-                )
-                event = None
-            if failure is not None:
-                quality.mark_invalid(failure.error_class)
-                pending_invalid.append((failure, msg.partition(), msg.offset()))
-                _send_dlq(dlq, failure, msg.partition(), msg.offset(), msg.value())
-            else:
-                quality.mark_valid()
-                payload = event.model_dump(mode="json")
-                pending_valid.append((event, msg.partition(), msg.offset(), payload))
-
-            full = len(pending_valid) + len(pending_invalid) >= settings.batch_size
-            stale = now - last_batch >= settings.batch_wait_seconds
-            if full or stale:
-                _flush(consumer, dlq, quality, pending_valid, pending_invalid)
-                pending_valid, pending_invalid = [], []
-                last_batch = time.time()
+            if pending_valid or pending_invalid:
+                if _flush(consumer, dlq, quality, pending_valid, pending_invalid):
+                    pending_valid, pending_invalid = [], []
+                    last_batch = time.time()
             quality.maybe_flush(settings.quality_interval_seconds, consumer_lag(consumer))
     finally:
         if pending_valid or pending_invalid:
@@ -177,16 +174,16 @@ def _load_cell_ids() -> set[str]:
             return {row[0] for row in cur.fetchall()}
 
 
-def _flush(consumer, dlq, quality: QualityTracker, valid, invalid) -> None:
+def _flush(consumer, dlq, quality: QualityTracker, valid, invalid) -> bool:
     if not valid and not invalid:
-        return
+        return True
     for attempt in range(1, 6):
         try:
             _raw, _clean, dups = insert_batch(valid, invalid)
             quality.mark_duplicate(dups)
             dlq.flush(5)
             consumer.commit(asynchronous=False)
-            return
+            return True
         except Exception as exc:  # noqa: BLE001
             quality.mark_db_error()
             log.warning(
@@ -195,6 +192,7 @@ def _flush(consumer, dlq, quality: QualityTracker, valid, invalid) -> None:
             )
             time.sleep(min(2**attempt, 10))
     log.error("batch_failed", extra={"event": "db_error", "error": "exhausted retries"})
+    return False
 
 
 if __name__ == "__main__":
