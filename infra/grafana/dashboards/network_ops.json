@@ -1,5 +1,7 @@
 {
-  "annotations": { "list": [] },
+  "annotations": {
+    "list": []
+  },
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -11,15 +13,39 @@
       "type": "stat",
       "title": "Active cells",
       "id": 1,
-      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
-      "datasource": { "type": "postgres", "uid": "postgres" },
-      "fieldConfig": { "defaults": { "decimals": 0 }, "overrides": [] },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "postgres", "uid": "postgres" },
-          "rawSql": "SELECT COUNT(DISTINCT cell_id) AS value FROM clean.network_metrics WHERE $__timeFilter(event_ts) AND ('$region' = 'All' OR region = '$region') AND ('$technology' = 'All' OR technology = '$technology') AND ('$site_id' = 'All' OR site_id = '$site_id');",
+          "datasource": {
+            "type": "postgres",
+            "uid": "postgres"
+          },
+          "rawSql": "SELECT COUNT(DISTINCT cell_id) AS value FROM clean.network_metrics WHERE $__timeFilter(event_ts) AND region IN (${region:sqlstring}) AND technology IN (${technology:sqlstring}) AND site_id IN (${site_id:sqlstring});",
           "format": "table"
         }
       ]
@@ -28,14 +54,53 @@
       "type": "stat",
       "title": "Network health",
       "id": 2,
-      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
-      "datasource": { "type": "postgres", "uid": "postgres" },
-      "fieldConfig": { "defaults": { "unit": "percent", "decimals": 1, "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "yellow", "value": 90 }, { "color": "green", "value": 97 } ] } }, "overrides": [] },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 0
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 90
+              },
+              {
+                "color": "green",
+                "value": 97
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT 100.0 * SUM(CASE WHEN network_status = 'UP' THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0) AS value FROM clean.network_metrics WHERE $__timeFilter(event_ts) AND ('$region' = 'All' OR region = '$region') AND ('$technology' = 'All' OR technology = '$technology') AND ('$site_id' = 'All' OR site_id = '$site_id') AND ('$cell_id' = 'All' OR cell_id = '$cell_id');",
+          "rawSql": "SELECT 100.0 * SUM(CASE WHEN network_status = 'UP' THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0) AS value FROM clean.network_metrics WHERE $__timeFilter(event_ts) AND region IN (${region:sqlstring}) AND technology IN (${technology:sqlstring}) AND site_id IN (${site_id:sqlstring}) AND cell_id IN (${cell_id:sqlstring});",
           "format": "table"
         }
       ]
@@ -44,10 +109,48 @@
       "type": "stat",
       "title": "Active incidents",
       "id": 3,
-      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
-      "datasource": { "type": "postgres", "uid": "postgres" },
-      "fieldConfig": { "defaults": { "decimals": 0, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 1 }, { "color": "red", "value": 5 } ] } }, "overrides": [] },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 0
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
       "targets": [
         {
           "refId": "A",
@@ -60,14 +163,36 @@
       "type": "stat",
       "title": "Avg latency",
       "id": 4,
-      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
-      "datasource": { "type": "postgres", "uid": "postgres" },
-      "fieldConfig": { "defaults": { "unit": "ms", "decimals": 1 }, "overrides": [] },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "none", "graphMode": "none" },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "none",
+        "graphMode": "none"
+      },
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT AVG(latency_ms) AS value FROM clean.network_metrics WHERE $__timeFilter(event_ts) AND ('$region' = 'All' OR region = '$region') AND ('$technology' = 'All' OR technology = '$technology') AND ('$site_id' = 'All' OR site_id = '$site_id') AND ('$cell_id' = 'All' OR cell_id = '$cell_id');",
+          "rawSql": "SELECT AVG(latency_ms) AS value FROM clean.network_metrics WHERE $__timeFilter(event_ts) AND region IN (${region:sqlstring}) AND technology IN (${technology:sqlstring}) AND site_id IN (${site_id:sqlstring}) AND cell_id IN (${cell_id:sqlstring});",
           "format": "table"
         }
       ]
@@ -76,14 +201,36 @@
       "type": "stat",
       "title": "Avg throughput",
       "id": 5,
-      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
-      "datasource": { "type": "postgres", "uid": "postgres" },
-      "fieldConfig": { "defaults": { "unit": "Mbits", "decimals": 1 }, "overrides": [] },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "none", "graphMode": "none" },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 0
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Mbits",
+          "decimals": 1
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "none",
+        "graphMode": "none"
+      },
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT AVG(throughput_mbps) AS value FROM clean.network_metrics WHERE $__timeFilter(event_ts) AND ('$region' = 'All' OR region = '$region') AND ('$technology' = 'All' OR technology = '$technology') AND ('$site_id' = 'All' OR site_id = '$site_id') AND ('$cell_id' = 'All' OR cell_id = '$cell_id');",
+          "rawSql": "SELECT AVG(throughput_mbps) AS value FROM clean.network_metrics WHERE $__timeFilter(event_ts) AND region IN (${region:sqlstring}) AND technology IN (${technology:sqlstring}) AND site_id IN (${site_id:sqlstring}) AND cell_id IN (${cell_id:sqlstring});",
           "format": "table"
         }
       ]
@@ -92,14 +239,35 @@
       "type": "stat",
       "title": "Anomaly count",
       "id": 6,
-      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
-      "datasource": { "type": "postgres", "uid": "postgres" },
-      "fieldConfig": { "defaults": { "decimals": 0 }, "overrides": [] },
-      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "value", "graphMode": "none" },
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 0
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      },
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT COUNT(*) AS value FROM ml.anomalies a JOIN clean.network_metrics m ON m.cell_id = a.cell_id AND m.event_ts = a.event_ts WHERE a.is_anomaly AND $__timeFilter(a.event_ts) AND ('$region' = 'All' OR m.region = '$region') AND ('$technology' = 'All' OR m.technology = '$technology');",
+          "rawSql": "SELECT COUNT(*) AS value FROM ml.anomalies a JOIN clean.network_metrics m ON m.cell_id = a.cell_id AND m.event_ts = a.event_ts WHERE a.is_anomaly AND $__timeFilter(a.event_ts) AND m.region IN (${region:sqlstring}) AND m.technology IN (${technology:sqlstring});",
           "format": "table"
         }
       ]
@@ -108,13 +276,31 @@
       "type": "timeseries",
       "title": "Latency over time",
       "id": 7,
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
-      "datasource": { "type": "postgres", "uid": "postgres" },
-      "fieldConfig": { "defaults": { "unit": "ms", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10 } }, "overrides": [] },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT date_trunc('minute', event_ts) AS time, AVG(latency_ms) AS \"Latency\" FROM clean.network_metrics WHERE $__timeFilter(event_ts) AND ('$region' = 'All' OR region = '$region') AND ('$technology' = 'All' OR technology = '$technology') AND ('$site_id' = 'All' OR site_id = '$site_id') AND ('$cell_id' = 'All' OR cell_id = '$cell_id') GROUP BY 1 ORDER BY 1;",
+          "rawSql": "SELECT date_trunc('minute', event_ts) AS time, AVG(latency_ms) AS \"Latency\" FROM clean.network_metrics WHERE $__timeFilter(event_ts) AND region IN (${region:sqlstring}) AND technology IN (${technology:sqlstring}) AND site_id IN (${site_id:sqlstring}) AND cell_id IN (${cell_id:sqlstring}) GROUP BY 1 ORDER BY 1;",
           "format": "time_series"
         }
       ]
@@ -123,13 +309,31 @@
       "type": "timeseries",
       "title": "Throughput over time",
       "id": 8,
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
-      "datasource": { "type": "postgres", "uid": "postgres" },
-      "fieldConfig": { "defaults": { "unit": "Mbits", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10 } }, "overrides": [] },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Mbits",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT date_trunc('minute', event_ts) AS time, AVG(throughput_mbps) AS \"Throughput\" FROM clean.network_metrics WHERE $__timeFilter(event_ts) AND ('$region' = 'All' OR region = '$region') AND ('$technology' = 'All' OR technology = '$technology') AND ('$site_id' = 'All' OR site_id = '$site_id') AND ('$cell_id' = 'All' OR cell_id = '$cell_id') GROUP BY 1 ORDER BY 1;",
+          "rawSql": "SELECT date_trunc('minute', event_ts) AS time, AVG(throughput_mbps) AS \"Throughput\" FROM clean.network_metrics WHERE $__timeFilter(event_ts) AND region IN (${region:sqlstring}) AND technology IN (${technology:sqlstring}) AND site_id IN (${site_id:sqlstring}) AND cell_id IN (${cell_id:sqlstring}) GROUP BY 1 ORDER BY 1;",
           "format": "time_series"
         }
       ]
@@ -138,13 +342,31 @@
       "type": "timeseries",
       "title": "Packet loss over time",
       "id": 9,
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
-      "datasource": { "type": "postgres", "uid": "postgres" },
-      "fieldConfig": { "defaults": { "unit": "percent", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10 } }, "overrides": [] },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT date_trunc('minute', event_ts) AS time, AVG(packet_loss_pct) AS \"Packet loss\" FROM clean.network_metrics WHERE $__timeFilter(event_ts) AND ('$region' = 'All' OR region = '$region') AND ('$technology' = 'All' OR technology = '$technology') AND ('$site_id' = 'All' OR site_id = '$site_id') AND ('$cell_id' = 'All' OR cell_id = '$cell_id') GROUP BY 1 ORDER BY 1;",
+          "rawSql": "SELECT date_trunc('minute', event_ts) AS time, AVG(packet_loss_pct) AS \"Packet loss\" FROM clean.network_metrics WHERE $__timeFilter(event_ts) AND region IN (${region:sqlstring}) AND technology IN (${technology:sqlstring}) AND site_id IN (${site_id:sqlstring}) AND cell_id IN (${cell_id:sqlstring}) GROUP BY 1 ORDER BY 1;",
           "format": "time_series"
         }
       ]
@@ -153,13 +375,30 @@
       "type": "timeseries",
       "title": "Active users",
       "id": 10,
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
-      "datasource": { "type": "postgres", "uid": "postgres" },
-      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10 } }, "overrides": [] },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT date_trunc('minute', event_ts) AS time, AVG(active_users) AS \"Users\" FROM clean.network_metrics WHERE $__timeFilter(event_ts) AND ('$region' = 'All' OR region = '$region') AND ('$technology' = 'All' OR technology = '$technology') AND ('$site_id' = 'All' OR site_id = '$site_id') AND ('$cell_id' = 'All' OR cell_id = '$cell_id') GROUP BY 1 ORDER BY 1;",
+          "rawSql": "SELECT date_trunc('minute', event_ts) AS time, AVG(active_users) AS \"Users\" FROM clean.network_metrics WHERE $__timeFilter(event_ts) AND region IN (${region:sqlstring}) AND technology IN (${technology:sqlstring}) AND site_id IN (${site_id:sqlstring}) AND cell_id IN (${cell_id:sqlstring}) GROUP BY 1 ORDER BY 1;",
           "format": "time_series"
         }
       ]
@@ -168,9 +407,25 @@
       "type": "timeseries",
       "title": "Anomalies over time",
       "id": 11,
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
-      "datasource": { "type": "postgres", "uid": "postgres" },
-      "fieldConfig": { "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 50 } }, "overrides": [] },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 20
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "postgres"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 50
+          }
+        },
+        "overrides": []
+      },
       "targets": [
         {
           "refId": "A",
@@ -183,12 +438,20 @@
       "type": "table",
       "title": "Worst cells by p95 latency (hourly)",
       "id": 12,
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
-      "datasource": { "type": "postgres", "uid": "postgres" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      },
+      "datasource": {
+        "type": "postgres",
+        "uid": "postgres"
+      },
       "targets": [
         {
           "refId": "A",
-          "rawSql": "SELECT cell_id, region, technology, ROUND(p95_latency_ms::numeric, 1) AS p95_latency_ms, ROUND(avg_packet_loss_pct::numeric, 2) AS avg_packet_loss_pct, max_active_users, anomaly_count FROM analytics.hourly_cell_metrics WHERE $__timeFilter(hour_ts) AND ('$region' = 'All' OR region = '$region') AND ('$technology' = 'All' OR technology = '$technology') ORDER BY p95_latency_ms DESC NULLS LAST LIMIT 20;",
+          "rawSql": "SELECT cell_id, region, technology, ROUND(p95_latency_ms::numeric, 1) AS p95_latency_ms, ROUND(avg_packet_loss_pct::numeric, 2) AS avg_packet_loss_pct, max_active_users, anomaly_count FROM analytics.hourly_cell_metrics WHERE $__timeFilter(hour_ts) AND region IN (${region:sqlstring}) AND technology IN (${technology:sqlstring}) ORDER BY p95_latency_ms DESC NULLS LAST LIMIT 20;",
           "format": "table"
         }
       ]
@@ -196,56 +459,86 @@
   ],
   "refresh": "10s",
   "schemaVersion": 39,
-  "tags": ["telecom", "noc"],
+  "tags": [
+    "telecom",
+    "noc"
+  ],
   "templating": {
     "list": [
       {
         "name": "region",
         "type": "query",
-        "datasource": { "type": "postgres", "uid": "postgres" },
+        "datasource": {
+          "type": "postgres",
+          "uid": "postgres"
+        },
         "includeAll": true,
-        "allValue": "All",
-        "current": { "text": "All", "value": "All" },
+        "current": {
+          "text": "All",
+          "value": "All"
+        },
         "query": "SELECT DISTINCT region FROM ops.sites ORDER BY 1;",
         "refresh": 1,
-        "sort": 1
+        "sort": 1,
+        "multi": true
       },
       {
         "name": "technology",
         "type": "query",
-        "datasource": { "type": "postgres", "uid": "postgres" },
+        "datasource": {
+          "type": "postgres",
+          "uid": "postgres"
+        },
         "includeAll": true,
-        "allValue": "All",
-        "current": { "text": "All", "value": "All" },
+        "current": {
+          "text": "All",
+          "value": "All"
+        },
         "query": "SELECT DISTINCT technology FROM ops.cells ORDER BY 1;",
         "refresh": 1,
-        "sort": 1
+        "sort": 1,
+        "multi": true
       },
       {
         "name": "site_id",
         "type": "query",
-        "datasource": { "type": "postgres", "uid": "postgres" },
+        "datasource": {
+          "type": "postgres",
+          "uid": "postgres"
+        },
         "includeAll": true,
-        "allValue": "All",
-        "current": { "text": "All", "value": "All" },
-        "query": "SELECT site_id FROM ops.sites WHERE ('$region' = 'All' OR region = '$region') ORDER BY 1;",
+        "current": {
+          "text": "All",
+          "value": "All"
+        },
+        "query": "SELECT site_id FROM ops.sites WHERE region IN (${region:sqlstring}) ORDER BY 1;",
         "refresh": 2,
-        "sort": 1
+        "sort": 1,
+        "multi": true
       },
       {
         "name": "cell_id",
         "type": "query",
-        "datasource": { "type": "postgres", "uid": "postgres" },
+        "datasource": {
+          "type": "postgres",
+          "uid": "postgres"
+        },
         "includeAll": true,
-        "allValue": "All",
-        "current": { "text": "All", "value": "All" },
-        "query": "SELECT cell_id FROM ops.cells WHERE ('$site_id' = 'All' OR site_id = '$site_id') ORDER BY 1;",
+        "current": {
+          "text": "All",
+          "value": "All"
+        },
+        "query": "SELECT cell_id FROM ops.cells WHERE site_id IN (${site_id:sqlstring}) ORDER BY 1;",
         "refresh": 2,
-        "sort": 1
+        "sort": 1,
+        "multi": true
       }
     ]
   },
-  "time": { "from": "now-6h", "to": "now" },
+  "time": {
+    "from": "now-12h",
+    "to": "now"
+  },
   "timepicker": {},
   "timezone": "browser",
   "title": "Network Operations",

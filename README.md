@@ -111,15 +111,28 @@ That prints precision, recall, F1, false-positive rate, and a confusion matrix a
 
 ## Measured results
 
-Fill these after a real run. Leave blank until then.
+From a local Docker run on 16 Aug 2026 (processor still catching up the 216k-event backfill). Re-run the commands below after lag is near 0 for a true live steady state.
 
 | Area | Metric | Value |
 |---|---|---|
-| Pipeline | Events processed | _TBD_ |
-| Pipeline | Invalid record % | _TBD_ |
-| Pipeline | Consumer lag (steady state) | _TBD_ |
-| Pipeline | Freshness (seconds) | _TBD_ |
-| ML | Precision / recall / F1 | _TBD_ |
+| Pipeline | Events processed | 51,882 received / 51,083 valid (snapshot); 61,180 rows in `clean.network_metrics` and growing |
+| Pipeline | Invalid record % | 1.54% (799 / 51,882) — matches the ~1.5% injected defects |
+| Pipeline | Consumer lag (steady state) | Not yet — ~160k during backfill catch-up. Recheck when live. |
+| Pipeline | Freshness (seconds) | ~14,868s during catch-up (old backfill timestamps). Expect ~10s once live. |
+| Pipeline | Validate latency | 0.14 ms / event |
+| ML | Precision / recall / F1 | 0.92 / 0.99 / 0.96 (n=60,107; FPR=0.02) |
+
+**Where each number comes from (not the Grafana KPI row):**
+
+```bash
+# Pipeline quality (received, valid, invalid, lag, freshness)
+docker exec telecom-postgres psql -U telecom -d telecom -c "SELECT * FROM ops.data_quality_snapshots ORDER BY snapshot_ts DESC LIMIT 1;"
+
+# ML precision / recall / F1 vs injected incidents
+docker exec telecom-ml python /app/scripts/evaluate_model.py
+```
+
+Grafana **Network Operations** is network health (cells, latency, throughput). Grafana **Pipeline Health** is closer to this table (lag, invalid count, freshness).
 
 ## Post-MVP (not in this repo yet)
 

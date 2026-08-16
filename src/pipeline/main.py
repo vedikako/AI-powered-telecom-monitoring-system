@@ -115,7 +115,7 @@ def run() -> None:
 
     try:
         while _running:
-            msg = consumer.poll(0.5)
+            msg = consumer.poll(0.05)
             _heartbeat()
             now = time.time()
 

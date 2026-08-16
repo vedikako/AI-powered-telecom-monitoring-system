@@ -27,11 +27,12 @@ services:
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_LISTENERS: PLAINTEXT://kafka:9092,CONTROLLER://kafka:9093
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
@@ -39,11 +40,11 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
       CLUSTER_ID: 4L6g3nShT-eMCtK--X86sw
     healthcheck:
-      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server kafka:9092 >/dev/null 2>&1"]
       interval: 10s
-      timeout: 10s
-      retries: 20
-      start_period: 20s
+      timeout: 15s
+      retries: 18
+      start_period: 40s
     restart: unless-stopped
 
   kafka-init:
@@ -56,6 +57,14 @@ services:
     entrypoint: ["/bin/bash", "-c"]
     command:
       - |
+        set -e
+        for i in $$(seq 1 30); do
+          if /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list >/dev/null 2>&1; then
+            break
+          fi
+          echo "waiting for kafka... $$i"
+          sleep 2
+        done
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic network.metrics --partitions 6 --replication-factor 1
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic network.metrics.dlq --partitions 3 --replication-factor 1
         /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list
@@ -108,6 +117,8 @@ services:
       KAFKA_METRICS_TOPIC: network.metrics
       KAFKA_DLQ_TOPIC: network.metrics.dlq
       KAFKA_CONSUMER_GROUP: metrics-processor
+      PROCESSOR_BATCH_SIZE: "500"
+      PROCESSOR_BATCH_WAIT_SECONDS: "1"
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     command: ["python", "-m", "pipeline.main"]
     healthcheck:
